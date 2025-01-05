@@ -1,72 +1,90 @@
+import time
+import pandas as pd
 from selenium import webdriver
 from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.service import Service
-import pandas as pd
-import time
+from selenium.webdriver.chrome.options import Options
 
-def scrape_google_dynamic(query, start_date, end_date, max_pages=50):
-    """
-    Scrapes Google search results dynamically using Selenium.
-
-    Args:
-    - query (str): The search query.
-    - start_date (str): Start date in 'YYYY-MM-DD' format.
-    - end_date (str): End date in 'YYYY-MM-DD' format.
-    - max_pages (int): Maximum number of pages to scrape.
-
-    Returns:
-    - pandas.DataFrame: DataFrame containing extracted URLs and titles.
-    """
-    options = webdriver.ChromeOptions()
+# Configure Selenium WebDriver
+def get_webdriver():
+    options = Options()
     options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36")
     options.add_argument("--disable-gpu")
+    options.add_argument("--window-size=1920x1080")
+    options.add_argument("--log-level=3")  # Suppress logs
     driver = webdriver.Chrome(service=Service(r"C:\Users\prady\Downloads\chromedriver-win32\chromedriver.exe"), options=options)
+    return driver
 
-    base_url = f"https://www.google.com/search?q={query}+after:{start_date}+before:{end_date}&tbm=nws"
-    driver.get(base_url)
-    all_results = []
+# Scrape NASDAQ News
+def scrape_nasdaq_news():
+    url = "https://www.nasdaq.com/market-activity/stocks/aapl/news-headlines"
+    driver = get_webdriver()
+    driver.get(url)
 
-    for page in range(max_pages):
-        print(f"Scraping page {page + 1}...")
-        time.sleep(2)  # Let the page load
+    articles = []
+    page_number = 1
 
-        # Extract article links and titles
-        articles = driver.find_elements(By.CSS_SELECTOR, "a.WlydOe")
-        for article in articles:
+    try:
+        while True:
+            print(f"Scraping page {page_number}...")
+
+            # Wait for the articles to load
+            WebDriverWait(driver, 20).until(
+                EC.presence_of_all_elements_located((By.CLASS_NAME, "jupiter22-c-article-list__item"))
+            )
+
+            # Find all news items on the page
+            news_items = driver.find_elements(By.CLASS_NAME, "jupiter22-c-article-list__item")
+            for item in news_items:
+                try:
+                    # Extract headline
+                    headline = item.find_element(By.CLASS_NAME, "jupiter22-c-article-list__item_title_wrapper").text
+
+                    # Extract link
+                    link = item.find_element(By.CLASS_NAME, "jupiter22-c-article-list__item_title_wrapper").get_attribute("href")
+
+                    # Extract category
+                    category = item.find_element(By.CLASS_NAME, "jupiter22-c-article-list__item_category").text
+
+                    # Extract time and publisher
+                    timestamp = item.find_element(By.CLASS_NAME, "jupiter22-c-article-list__item_timeline").text
+                    publisher = item.find_element(By.CLASS_NAME, "jupiter22-c-article-list__item_publisher").text
+
+                    # Add to articles list
+                    articles.append({
+                        "Headline": headline,
+                        "Link": link,
+                        "Category": category,
+                        "Time": timestamp,
+                        "Publisher": publisher
+                    })
+                except Exception as e:
+                    print(f"Error extracting article: {e}")
+
+            # Check for the "Next" button and navigate
             try:
-                link = article.get_attribute("href")
-                title = article.text
-                all_results.append({"Title": title, "URL": link})
-            except Exception as e:
-                print(f"Error extracting article: {e}")
+                next_button = WebDriverWait(driver, 10).until(
+                    EC.element_to_be_clickable((By.CLASS_NAME, "pagination__next"))
+                )
+                if next_button.get_attribute("disabled") == "true":
+                    print("No more pages available.")
+                    break
+                next_button.click()
+                time.sleep(2)
+                page_number += 1
+            except Exception:
+                print("No next page button found.")
+                break
+    finally:
+        driver.quit()
 
-        # Check if the "Next" button exists and click it
-        try:
-            next_button = driver.find_element(By.ID, "pnnext")
-            next_button.click()
-        except Exception:
-            print("No more pages found. Exiting.")
-            break
+    # Save articles to CSV
+    df = pd.DataFrame(articles)
+    df.to_csv("nasdaq_news_aapl.csv", index=False)
+    print(f"Scraping complete! {len(articles)} articles saved to 'nasdaq_news_aapl.csv'.")
 
-    driver.quit()
-    return pd.DataFrame(all_results)
-
-# Example usage
-def main():
-    query = 'site:nasdaq.com "Apple stock financial news"'
-    start_date = "2024-01-01"
-    end_date = "2024-12-31"
-    max_pages = 10000  # Adjust based on requirements
-
-    # Scrape Google Search results
-    df = scrape_google_dynamic(query, start_date, end_date, max_pages)
-
-    # Save results to a CSV
-    if not df.empty:
-        df.to_csv("apple_2024_news_urls.csv", index=False)
-        print(f"Scraping complete! Saved {len(df)} results to 'apple_2024_news_urls.csv'.")
-    else:
-        print("No results found.")
-
+# Run the script
 if __name__ == "__main__":
-    main()
+    scrape_nasdaq_news()
