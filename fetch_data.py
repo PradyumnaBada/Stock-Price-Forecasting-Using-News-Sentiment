@@ -50,11 +50,12 @@ def prepare_new_data(tickers, filepath=None, start_date='2023-12-12', end_date= 
 
 
 def fetch_data(tickers, start_date, end_date):
-    sentiment_data = pd.read_csv('data_with_wieghted_sentiment.csv')
+    path = r"C:\Users\prady\OneDrive - University of Illinois - Urbana\Desktop\CS 498\final_project_new\data\original" + '\\'
+    sentiment_data = pd.read_csv(path + 'data_with_wieghted_sentiment.csv')
     sentiment_data = sentiment_data[sentiment_data['Stock_symbol'] == tickers]
     sentiment_data['RollingSentiment'] = sentiment_data['WeightedSentiment'].rolling(window=30).mean()
     mean_sentiment = sentiment_data['RollingSentiment'].mean()
-    recent_data = prepare_new_data(tickers, filepath=f'{tickers}.US_news_api_recent.csv',mean=mean_sentiment)
+    recent_data = prepare_new_data(tickers, filepath= path + f'{tickers}.US_news_api_recent.csv',mean=mean_sentiment)
     live_news = fetch_live_data(tickers, to_date = end_date)
     #print(live_news)
     live_data = prepare_new_data(tickers, mean=mean_sentiment,df=live_news,start_date='2024-05-10', end_date=end_date)
@@ -72,7 +73,7 @@ def fetch_data(tickers, start_date, end_date):
         news_text = pd.concat([live_news, news_text], axis=1)
         news_text = news_text.loc[:10, ['title', 'link', 'polarity']]
     elif end_date >= datetime.strptime('2024-01-01', '%Y-%m-%d').date():
-        old_news = pd.read_csv(f'{tickers}.US_news_api_recent.csv')
+        old_news = pd.read_csv(path + f'{tickers}.US_news_api_recent.csv')
         def convert_string_to_dict(string):
             try:
                 return ast.literal_eval(string)

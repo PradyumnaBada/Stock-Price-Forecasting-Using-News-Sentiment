@@ -52,37 +52,44 @@ def scrape_google_dynamic(query, start_date, end_date, max_pages=50):
     driver.quit()
     return pd.DataFrame(all_results)
 
-def get_date_ranges(start_year, start_month, interval=2, periods=6):
+def get_date_ranges(start_year, start_month, end_year, end_month, interval=2):
     """
     Generates start and end dates for specified intervals.
 
     Args:
     - start_year (int): Starting year.
     - start_month (int): Starting month.
+    - end_year (int): Ending year.
+    - end_month (int): Ending month.
     - interval (int): Interval in months.
-    - periods (int): Number of periods.
 
     Returns:
     - list of (start_date, end_date) tuples.
     """
     ranges = []
     current_date = datetime(start_year, start_month, 1)
-    for _ in range(periods):
+    end_date = datetime(end_year, end_month, 1)
+
+    while current_date < end_date:
         start_date = current_date.strftime("%Y-%m-%d")
-        end_date = (current_date + timedelta(days=59)).strftime("%Y-%m-%d")  # Approximately 2 months
-        ranges.append((start_date, end_date))
-        current_date += timedelta(days=60)
+        next_date = current_date + timedelta(days=interval * 30)  # Approx. 2 months
+        end_range = (next_date - timedelta(days=1)).strftime("%Y-%m-%d")  # End of 2-month range
+        ranges.append((start_date, end_range))
+        current_date = next_date
+
     return ranges
 
 def main():
     stocks = ['Apple', 'Tesla', 'NVIDIA', 'Amazon']
     base_query = 'site:nasdaq.com "{stock} stock financial news"'
-    start_year = 2024
-    start_month = 1
+    start_year = 2023
+    start_month = 11
+    end_year = 2024
+    end_month = 12
     max_pages = 50  # Adjust based on requirements
 
     # Generate date ranges
-    date_ranges = get_date_ranges(start_year, start_month)
+    date_ranges = get_date_ranges(start_year, start_month, end_year, end_month)
 
     for stock in stocks:
         for i, (start_date, end_date) in enumerate(date_ranges):
@@ -93,9 +100,10 @@ def main():
             df = scrape_google_dynamic(query, start_date, end_date, max_pages)
 
             # Save to CSV
-            filename = f"{stock.lower()}_news_{start_date}_to_{end_date}.csv"
+            path = r"C:\Users\prady\OneDrive - University of Illinois - Urbana\Desktop\CS 498\final_project_new\data\New_data"
+            filename = f"\{stock.lower()}_news_{start_date}_to_{end_date}.csv"
             if not df.empty:
-                df.to_csv(filename, index=False)
+                df.to_csv(path+filename, index=False)
                 print(f"Saved {len(df)} results to '{filename}'.")
             else:
                 print(f"No results found for {stock} from {start_date} to {end_date}.")
