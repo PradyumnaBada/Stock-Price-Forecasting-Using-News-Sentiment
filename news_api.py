@@ -15,6 +15,8 @@ DEFAULT_START_DATE = datetime.strptime("20220410T0130", "%Y%m%dT%H%M")
 DEFAULT_END_DATE_LIMIT = datetime.strptime("20250110T0130", "%Y%m%dT%H%M")
 
 def api_call(ticker,time_from, time_to):
+    time_from = time_from.strftime("%Y%m%dT%H%M")
+    time_to = time_to.strftime("%Y%m%dT%H%M")
     url = f'https://www.alphavantage.co/query?function=NEWS_SENTIMENT&tickers={ticker}&time_from={time_from}&time_to={time_to}&limit=1000&apikey={API_KEY}'
     response = requests.get(url)
     data = response.json()
@@ -33,18 +35,16 @@ def fetch_news_data(ticker, start_date=None, end_date_limit=None):
         if current_end_date > end_date_limit:
             current_end_date = end_date_limit
 
-        # Format dates for the API
-        time_from = current_start_date.strftime("%Y%m%dT%H%M")
-        time_to = current_end_date.strftime("%Y%m%dT%H%M")
-
         # Make the API request
-        data = api_call(ticker,time_from, time_to)
+        data = api_call(ticker,current_start_date, current_end_date)
 
         if len(data) == 1 or 'feed' not in data:
             print(f"Rate limit or invalid response for API key {API_KEY}.")
             break
         # Save the data to a JSON file
-        output_file = f"data/New_data/{ticker}_{time_from}_to_{time_to}.json"
+        time_from_str = current_start_date.strftime("%Y%m%dT%H%M")
+        time_to_str = current_end_date.strftime("%Y%m%dT%H%M")
+        output_file = f"data/New_data/{ticker}_{time_from_str}_to_{time_to_str}.json"
         with open(output_file, "w") as json_file:
             json.dump(data, json_file, indent=4)
 
@@ -90,8 +90,7 @@ def join_files():
     df.to_csv("data/New_data/processed/news_data.csv", index=False)
     return df
 
-def weighted_sentiment(path=r"data/New_data/processed/news_data.csv"):
-    df = pd.read_csv(path)
+def weighted_sentiment(df):
     df_filter = df[df['relevance'] > 0.1]
     df_filter['time'] = pd.to_datetime(df_filter['time'], format='%Y%m%dT%H%M%S')
     df_filter = df_filter[df_filter['time'] <= '2025-01-10 01:30:00']
@@ -112,5 +111,6 @@ def weighted_sentiment(path=r"data/New_data/processed/news_data.csv"):
     # grouped_sentiment['negative_sentiment'].fillna(0, inplace=True)
     # grouped_sentiment['WeightedSentiment'] = grouped_sentiment['positive_sentiment'] + grouped_sentiment['negative_sentiment']
 
+    return grouped_sentiment
 
-weighted_sentiment()
+
